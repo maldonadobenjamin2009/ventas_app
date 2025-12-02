@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bitácora - Punto de Venta</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        :root { --primary: #10b981; --secondary: #64748b; --success: #22c55e; --danger: #ef4444; --warning: #f59e0b; --bg-body: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border: #e2e8f0; --radius: 12px; }
+        body.dark-mode { --primary: #34d399; --bg-body: #0f172a; --bg-card: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8; --border: #334155; }
+        * { box-sizing: border-box; outline: none; }
+        body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; transition: 0.3s; height: 100vh; overflow: hidden; }
+        
+        /* LOGIN */
+        #login-view { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; display: flex; flex-direction: column; justify-content: center; align-items: center; background: var(--bg-body); }
+        .pin-card { background: var(--bg-card); padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 90%; max-width: 400px; }
+        .pin-input { font-size: 3rem; letter-spacing: 10px; text-align: center; width: 100%; border: none; border-bottom: 3px solid var(--primary); background: transparent; color: var(--text-main); font-family: monospace; margin: 20px 0; font-weight: bold; }
+
+        /* APP */
+        .main-wrapper { max-width: 1200px; margin: 0 auto; padding: 15px; display: none; height: 100%; grid-template-rows: auto auto 1fr; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; background: var(--bg-card); padding: 10px 15px; border-radius: var(--radius); }
+        
+        /* TABS */
+        .nav-tabs { display: flex; gap: 10px; margin-bottom: 15px; overflow-x: auto; }
+        .nav-btn { flex: 1; padding: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); border-radius: var(--radius); cursor: pointer; white-space: nowrap; position: relative; }
+        .nav-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .badge { position: absolute; top: -5px; right: -5px; background: var(--danger); color: white; border-radius: 50%; width: 20px; height: 20px; font-size: 0.7rem; display: flex; align-items: center; justify-content: center; border: 2px solid var(--bg-card); }
+
+        /* CONTENT */
+        .content-area { overflow: hidden; height: 100%; display: grid; }
+        .pos-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; height: 100%; overflow: hidden; }
+        @media (max-width: 768px) { .pos-grid { grid-template-columns: 1fr; grid-template-rows: 1fr auto; } }
+
+        .card { background: var(--bg-card); border-radius: var(--radius); padding: 15px; border: 1px solid var(--border); display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+        
+        /* LISTS & BUTTONS */
+        ul { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        li.item-row { background: rgba(0,0,0,0.03); padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        button { padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-warning { background: var(--warning); color: #fff; }
+        .btn-secondary { background: var(--secondary); color: white; }
+        .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
+
+        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-main); }
+
+        /* MODALS */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; }
+        .modal-content { background: var(--bg-card); padding: 25px; border-radius: var(--radius); width: 90%; max-width: 400px; text-align: center; }
+        
+        #toast { visibility: hidden; min-width: 250px; background: #333; color: #fff; text-align: center; border-radius: 4px; padding: 16px; position: fixed; z-index: 7000; left: 50%; bottom: 30px; transform: translateX(-50%); }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body>
+
+<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:6000; justify-content:center; align-items:center;">
+    <i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary)"></i>
+</div>
+
+<!-- 1. LOGIN -->
+<div id="login-view">
+    <div class="pin-card">
+        <h2 style="color:var(--primary);"><i class="fas fa-store"></i> Bitácora POS</h2>
+        <input type="tel" id="store-code" class="pin-input" maxlength="6" placeholder="000000">
+        <button class="btn-primary" onclick="connectToStore()" style="width:100%; font-size:1.1rem;">CONECTAR</button>
+        <p id="error-msg" style="color:var(--danger); margin-top:10px;"></p>
+    </div>
+</div>
+
+<!-- 2. APP -->
+<div id="app-view" class="main-wrapper">
+    <div class="header">
+        <div>
+            <h3 style="margin:0;">Punto de Venta</h3>
+            <span id="store-status" style="font-size:0.8rem; color:var(--success)">● Conectado</span>
+        </div>
+        <div style="display:flex; gap:10px;">
+            <button class="btn-secondary btn-sm" onclick="toggleDarkMode()"><i class="fas fa-moon"></i></button>
+            <button class="btn-danger btn-sm" onclick="disconnect()"><i class="fas fa-power-off"></i></button>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="nav-tabs">
+        <button class="nav-btn active" onclick="setTab('sell')"><i class="fas fa-cash-register"></i> Caja</button>
+        <button class="nav-btn" onclick="setTab('orders')">
+            <i class="fas fa-truck-loading"></i> Pedidos 
+            <span id="orders-badge" class="badge" style="display:none">0</span>
+        </button>
+        <button class="nav-btn" onclick="setTab('stock')"><i class="fas fa-boxes"></i> Stock</button>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="content-area">
+        
+        <!-- VISTA CAJA -->
+        <div id="view-sell" class="pos-grid">
+            <div class="card">
+                <h3>Catálogo</h3>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="pos-search" onkeyup="renderPOS()" placeholder="Buscar producto..." style="margin-bottom:0">
+                    <button class="btn-warning btn-sm" onclick="openGlobalSearch()"><i class="fas fa-globe"></i> Global</button>
+                </div>
+                <ul id="pos-list" style="margin-top:10px;"></ul>
+            </div>
+            <div class="card" style="border-left: 4px solid var(--primary);">
+                <h3>Ticket</h3>
+                <ul id="cart-list"></ul>
+                <div style="margin-top:auto;">
+                    <div style="display:flex; justify-content:space-between; font-size:1.5rem; font-weight:bold; margin-bottom:10px;">
+                        <span>Total:</span><span id="cart-total">$0.00</span>
+                    </div>
+                    <button class="btn-success" onclick="openCheckout()" style="width:100%; font-size:1.2rem;">COBRAR</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VISTA PEDIDOS -->
+        <div id="view-orders" class="card" style="display:none; overflow-y:auto;">
+            <h3>Gestión de Transferencias</h3>
+            
+            <h4 style="color:var(--warning); margin:10px 0;">📥 Por Aprobar (Me piden a mi)</h4>
+            <ul id="list-incoming" style="max-height:200px; border:1px solid var(--border); padding:5px; margin-bottom:20px;"></ul>
+
+            <h4 style="color:var(--primary); margin:10px 0;">🚚 En Camino (Aprobados, vienen hacia mi)</h4>
+            <ul id="list-transit" style="max-height:150px; border:1px solid var(--border); padding:5px; margin-bottom:20px;"></ul>
+
+            <h4 style="color:var(--text-muted); margin:10px 0;">📤 Mis Solicitudes (Pendientes)</h4>
+            <ul id="list-outgoing" style="max-height:150px; border:1px solid var(--border); padding:5px;"></ul>
+        </div>
+
+        <!-- VISTA STOCK -->
+        <div id="view-stock" class="card" style="display:none;">
+            <h3>Inventario Completo</h3>
+            <input type="text" id="inv-search" onkeyup="renderStock()" placeholder="🔍 Filtrar nombre, marca...">
+            <ul id="stock-list"></ul>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CHECKOUT -->
+<div id="checkout-modal" class="modal">
+    <div class="modal-content">
+        <h2>Confirmar Venta</h2>
+        <p style="font-size:2rem; font-weight:bold; color:var(--primary)" id="modal-total-display">$0</p>
+        <input id="client-name" placeholder="Cliente">
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button class="btn-secondary" onclick="closeModal('checkout-modal')">Cancelar</button>
+            <button class="btn-success" onclick="processSale()">CONFIRMAR</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL BUSQUEDA GLOBAL (DISEÑO FLUIDO) -->
+<div id="global-modal" class="modal">
+    <div class="modal-content" style="max-width: 600px; height: 80vh; display: flex; flex-direction: column; padding: 0;">
+        
+        <!-- Cabecera (Fija) -->
+        <div style="padding: 20px 20px 10px 20px; border-bottom: 1px solid var(--border);">
+            <h3 style="margin-top:0; margin-bottom:15px;"><i class="fas fa-search-location"></i> Inventario Global</h3>
+            <input id="global-search-input" placeholder="🔍 Nombre o ID Global..." onkeyup="searchGlobal()" style="margin-bottom:0">
+        </div>
+
+        <!-- Lista (Con Scroll) -->
+        <div style="flex: 1; overflow-y: auto; padding: 10px 20px; background: var(--bg-body);">
+            <ul id="global-list" style="margin: 0; padding: 0;"></ul>
+        </div>
+
+        <!-- Pie (Fijo) -->
+        <div style="padding: 10px 20px 20px 20px; border-top: 1px solid var(--border);">
+            <button class="btn-secondary" onclick="closeModal('global-modal')" style="width:100%">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CANTIDAD PEDIDO -->
+<div id="request-modal" class="modal">
+    <div class="modal-content">
+        <h3>Solicitar Transferencia</h3>
+        <p id="req-prod-name" style="font-weight:bold; color:var(--primary)"></p>
+        <input type="hidden" id="req-prod-id">
+        <input type="number" id="req-qty" placeholder="Cantidad" value="1" min="1">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn-secondary" onclick="closeModal('request-modal')">Cancelar</button>
+            <button class="btn-primary" onclick="submitRequest()">Pedir</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+    // --- CREDENCIALES SUPABASE ---
+    const SUPABASE_URL = 'https://yjfzoqosaajwujwmmmya.supabase.co'; 
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlqZnpvcW9zYWFqd3Vqd21tbXlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQyOTg5MzAsImV4cCI6MjA3OTg3NDkzMH0.rj4L0ig7QrGwI2LFRgglA0gSRumurMCLqF8JqH9kXgI'; 
+    
+    let supabaseClient = null;
+    let activeCode = null;
+    let products = [];
+    let cart = [];
+    let transfers = [];
+
+    document.addEventListener('DOMContentLoaded', () => {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        const savedCode = localStorage.getItem('pos_code');
+        if(savedCode) { document.getElementById('store-code').value = savedCode; connectToStore(); }
+        if(localStorage.getItem('dark_mode')==='1') document.body.classList.add('dark-mode');
+    });
+
+    async function connectToStore() {
+        const code = document.getElementById('store-code').value.trim();
+        if(code.length !== 6) return alert("Código inválido");
+        document.getElementById('loading-overlay').style.display = 'flex';
+
+        try {
+            const { data, error } = await supabaseClient.rpc('get_inventory_by_code', { lookup_code: code });
+            if(error) throw error;
+            if(data) {
+                activeCode = code;
+                products = data;
+                localStorage.setItem('pos_code', code);
+                document.getElementById('login-view').style.display='none';
+                document.getElementById('app-view').style.display='grid';
+                renderPOS();
+                fetchTransfers();
+                subscribeRealtime();
+            } else { throw new Error("Código no encontrado"); }
+        } catch (e) {
+            document.getElementById('error-msg').textContent = "Error: " + e.message;
+            localStorage.removeItem('pos_code');
+        } finally { document.getElementById('loading-overlay').style.display = 'none'; }
+    }
+
+    function subscribeRealtime() {
+        supabaseClient.channel('pos-room')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => refreshInventory())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'transfer_requests' }, () => fetchTransfers())
+        .subscribe();
+    }
+
+    async function refreshInventory() {
+        const { data } = await supabaseClient.rpc('get_inventory_by_code', { lookup_code: activeCode });
+        if(data) { products = data; renderPOS(); if(document.getElementById('view-stock').style.display === 'flex') renderStock(); }
+    }
+
+    // --- POS LOGIC (CAJA) ---
+    function renderPOS() {
+        const list = document.getElementById('pos-list'); list.innerHTML = '';
+        const term = document.getElementById('pos-search').value.toLowerCase();
+        
+        products.filter(p => p.name.toLowerCase().includes(term) && p.quantity > 0).forEach(p => {
+            list.innerHTML += `<li class="item-row"><div><b>${p.name}</b><br><small>${p.brand||''}</small> | $${p.price}</div><button class="btn-primary btn-sm" onclick="addToCart('${p.id}')">+</button></li>`;
+        });
+    }
+
+    function addToCart(id) {
+        const p = products.find(x => x.id === id);
+        const ex = cart.find(c => c.id === id);
+        if(ex) { if(ex.qty < p.quantity) ex.qty++; else return showToast("Max Stock"); }
+        else cart.push({...p, qty:1});
+        renderCart();
+    }
+
+    function renderCart() {
+        const list = document.getElementById('cart-list'); list.innerHTML = '';
+        let total = 0;
+        cart.forEach((c,i) => {
+            total += c.price * c.qty;
+            list.innerHTML += `<li class="item-row" style="background:white"><div><b>${c.qty}x</b> ${c.name}</div><button class="btn-danger btn-sm" onclick="cart.splice(${i},1);renderCart()">x</button></li>`;
+        });
+        document.getElementById('cart-total').textContent = '$'+total.toFixed(2);
+    }
+
+    // --- STOCK LOGIC ---
+    function renderStock() {
+        const list = document.getElementById('stock-list'); 
+        if (!list) return; 
+        
+        list.innerHTML = '';
+        
+        const searchInput = document.getElementById('inv-search');
+        const term = searchInput ? searchInput.value.toLowerCase() : '';
+
+        const filtered = products.filter(p => {
+            const name = (p.name || '').toLowerCase();
+            const brand = (p.brand || '').toLowerCase();
+            return name.includes(term) || brand.includes(term);
+        });
+
+        if(filtered.length === 0) {
+            list.innerHTML = '<div style="text-align:center; padding:20px; color:gray; margin-top:20px;">Sin resultados</div>';
+            return;
+        }
+
+        filtered.forEach(p => {
+            const isGlobal = !p.store_code || p.store_code === '';
+            const badge = isGlobal 
+                ? '<span style="background:#e0f2fe; color:#0284c7; padding:2px 6px; border-radius:4px; font-size:0.7em">Global</span>' 
+                : '<span style="background:#ecfdf5; color:#059669; padding:2px 6px; border-radius:4px; font-size:0.7em">Local</span>';
+            const qtyColor = p.quantity > 0 ? 'var(--text-main)' : 'var(--danger)';
+
+            list.innerHTML += `
+                <li class="item-row">
+                    <div>
+                        <strong>${p.name}</strong> ${badge}<br>
+                        <small>${p.brand||''} ${p.model||''}</small>
+                    </div>
+                    <div style="text-align:right">
+                        <div style="font-weight:bold; font-size:1.1em; color:${qtyColor}">${p.quantity}</div>
+                        <small style="color:gray">unid.</small>
+                    </div>
+                </li>
+            `;
+        });
+    }
+
+    // --- TRANSFERS ---
+    async function fetchTransfers() {
+        const { data } = await supabaseClient.rpc('get_my_transfers', { my_code: activeCode });
+        if(data) {
+            transfers = data;
+            renderTransfers();
+        }
+    }
+
+    function renderTransfers() {
+        const incoming = document.getElementById('list-incoming'); incoming.innerHTML = '';
+        const transit = document.getElementById('list-transit'); transit.innerHTML = '';
+        const outgoing = document.getElementById('list-outgoing'); outgoing.innerHTML = '';
+        
+        let pendingActionCount = 0;
+
+        transfers.forEach(t => {
+            if (t.to_store_code === activeCode && t.status === 'pending') {
+                pendingActionCount++;
+                incoming.innerHTML += `
+                    <li class="item-row" style="border-left:4px solid var(--warning)">
+                        <div>
+                            <b>${t.quantity}x ${t.product_name}</b><br>
+                            <small>Solicita: Local ${t.from_store_code}</small>
+                        </div>
+                        <div style="display:flex; gap:5px">
+                            <button class="btn-success btn-sm" onclick="manageTransfer('${t.id}', 'approve')"><i class="fas fa-check"></i></button>
+                            <button class="btn-danger btn-sm" onclick="manageTransfer('${t.id}', 'reject')"><i class="fas fa-times"></i></button>
+                        </div>
+                    </li>`;
+            }
+            else if (t.from_store_code === activeCode && t.status === 'in_transit') {
+                pendingActionCount++;
+                transit.innerHTML += `
+                    <li class="item-row" style="border-left:4px solid var(--primary)">
+                        <div>
+                            <b>${t.quantity}x ${t.product_name}</b><br>
+                            <small>Enviado por: Local ${t.to_store_code}</small>
+                        </div>
+                        <button class="btn-primary btn-sm" onclick="manageTransfer('${t.id}', 'receive')">Recibir</button>
+                    </li>`;
+            }
+            else if (t.from_store_code === activeCode && t.status === 'pending') {
+                outgoing.innerHTML += `<li class="item-row" style="opacity:0.7">⏳ Esperando ${t.quantity}x ${t.product_name} de Local ${t.to_store_code}</li>`;
+            }
+        });
+
+        const badge = document.getElementById('orders-badge');
+        badge.textContent = pendingActionCount;
+        badge.style.display = pendingActionCount > 0 ? 'flex' : 'none';
+    }
+
+    async function manageTransfer(id, action) {
+        if(!confirm("¿Confirmar acción?")) return;
+        const { error } = await supabaseClient.rpc('manage_transfer', { request_id: id, action_type: action });
+        if(error) alert("Error: " + error.message);
+        else { showToast("Actualizado"); fetchTransfers(); }
+    }
+
+    // --- GLOBAL SEARCH ---
+    function openGlobalSearch() {
+        const input = document.getElementById('global-search-input');
+        const list = document.getElementById('global-list');
+        
+        input.value = ''; 
+        document.getElementById('global-modal').style.display = 'flex';
+        
+        setTimeout(() => input.focus(), 100); 
+        
+        searchGlobal(); // Ahora carga todo al abrir
+    }
+
+    async function searchGlobal() {
+        const input = document.getElementById('global-search-input');
+        const term = input.value ? input.value.trim() : ''; // Asegurar que no sea null
+
+        const list = document.getElementById('global-list');
+        list.innerHTML = `<li style="text-align:center; padding:20px; list-style:none; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Cargando...</li>`;
+
+        // Añadimos console.log para ver qué estamos enviando
+        console.log("Enviando búsqueda:", { my_store_code: activeCode, search_term: term });
+
+        const { data, error } = await supabaseClient.rpc('search_other_stores', { 
+            my_store_code: activeCode, 
+            search_term: term 
+        });
+        
+        if (error) {
+            // CAMBIO IMPORTANTE: Imprimir el mensaje y los detalles, no solo el objeto
+            console.error("Error SQL:", error.message, error.details, error.hint);
+            list.innerHTML = `<li style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</li>`;
+            return;
+        }
+
+        list.innerHTML = '';
+        
+        if(data && data.length > 0) {
+            data.forEach(item => {
+                const isMyStore = item.store_code === activeCode;
+                
+                const actionButton = isMyStore 
+                    ? `<span class="btn-sm" style="background:#ecfdf5; color:#059669; border:1px solid #059669; cursor:default; font-size:0.75rem; white-space:nowrap;"><i class="fas fa-check"></i> Aquí</span>`
+                    : `<button class="btn-warning btn-sm" onclick="prepRequest('${item.id}', '${item.name}')">Pedir</button>`;
+
+                let locationBadge = `<span style="color:var(--primary); font-weight:bold; font-size:0.9em"><i class="fas fa-store"></i> ${item.store_name}</span>`;
+                if(isMyStore) locationBadge = `<span style="color:var(--success); font-weight:bold; font-size:0.9em"><i class="fas fa-map-marker-alt"></i> ${item.store_name}</span>`;
+                if(item.store_name.includes('Depósito')) locationBadge = `<span style="color:#6366f1; font-weight:bold; font-size:0.9em"><i class="fas fa-warehouse"></i> ${item.store_name}</span>`;
+
+                list.innerHTML += `
+                    <li class="item-row" style="background: var(--bg-card); border: 1px solid var(--border); margin-bottom: 8px; align-items:center;">
+                        <div style="flex:1; padding-right:10px;">
+                            <div style="font-size:1.1em; font-weight:bold; color:var(--text-main);">${item.name}</div>
+                            <div style="color:gray; font-size:0.85em; margin-bottom:4px;">${item.brand || ''} ${item.model || ''}</div>
+                            
+                            ${locationBadge}
+                            
+                            <div style="margin-top:4px; font-size:0.85em; color:var(--text-muted);">
+                                Stock: <b style="color:var(--text-main)">${item.quantity}</b> 
+                                <span style="opacity:0.5; margin-left:8px;">Global ID: ${item.global_id ? item.global_id.substring(0,6) : '---'}</span>
+                            </div>
+                        </div>
+                        ${actionButton}
+                    </li>`;
+            });
+        } else {
+            list.innerHTML = `
+                <li style="text-align:center; padding: 20px; color: var(--text-muted); list-style:none;">
+                    <i class="fas fa-box-open" style="font-size: 2rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
+                    No se encontraron productos asociados a este usuario.
+                </li>`;
+        }
+    }
+    function prepRequest(id, name) {
+        document.getElementById('req-prod-id').value = id;
+        document.getElementById('req-prod-name').textContent = name;
+        document.getElementById('request-modal').style.display = 'flex';
+    }
+
+    async function submitRequest() {
+        const id = document.getElementById('req-prod-id').value;
+        const qty = parseInt(document.getElementById('req-qty').value);
+        const { error } = await supabaseClient.rpc('create_transfer_request', { requester_code: activeCode, target_prod_id: id, qty: qty });
+        if(error) alert(error.message);
+        else { showToast("Solicitud enviada"); closeModal('request-modal'); closeModal('global-modal'); fetchTransfers(); }
+    }
+
+    // --- CHECKOUT ---
+    function openCheckout() {
+        if(cart.length === 0) return;
+        document.getElementById('modal-total-display').textContent = document.getElementById('cart-total').textContent;
+        document.getElementById('checkout-modal').style.display = 'flex';
+    }
+
+    async function processSale() {
+        const client = document.getElementById('client-name').value || 'Final';
+        const total = parseFloat(document.getElementById('cart-total').textContent.replace('$',''));
+        const cartData = cart.map(c => ({ id: c.id, name: c.name, qty: c.qty }));
+
+        const { error } = await supabaseClient.rpc('complete_checkout', {
+            shop_code: activeCode, client_name: client, sale_total: total, cart_items: cartData
+        });
+
+        if(error) alert(error.message);
+        else { showToast("Venta OK"); cart=[]; renderCart(); closeModal('checkout-modal'); refreshInventory(); }
+    }
+
+    // UTILS
+    function setTab(t) {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+        
+        document.getElementById('view-sell').style.display='none';
+        document.getElementById('view-orders').style.display='none';
+        document.getElementById('view-stock').style.display='none';
+        
+        const view = document.getElementById('view-'+t);
+        if(view) {
+            // Corrección para que stock y otros usen display correcto
+            if (t === 'sell') view.style.display = 'grid';
+            else if (t === 'orders') view.style.display = 'block';
+            else if (t === 'stock') {
+                view.style.display = 'flex'; 
+                renderStock(); 
+            }
+        }
+    }
+    function closeModal(id) { document.getElementById(id).style.display='none'; }
+    function showToast(m) { const t=document.getElementById('toast'); t.textContent=m; t.className='show'; setTimeout(()=>t.className='',3000); }
+    function toggleDarkMode() { document.body.classList.toggle('dark-mode'); localStorage.setItem('dark_mode', document.body.classList.contains('dark-mode')?'1':'0'); }
+    function disconnect() { localStorage.removeItem('pos_code'); location.reload(); }
+
+</script>
+</body>
+</html>
