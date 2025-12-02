@@ -8,8 +8,38 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <style>
-        :root { --primary: #10b981; --secondary: #64748b; --success: #22c55e; --danger: #ef4444; --warning: #f59e0b; --bg-body: #f1f5f9; --bg-card: #ffffff; --text-main: #0f172a; --text-muted: #64748b; --border: #e2e8f0; --radius: 12px; }
-        body.dark-mode { --primary: #34d399; --bg-body: #0f172a; --bg-card: #1e293b; --text-main: #f1f5f9; --text-muted: #94a3b8; --border: #334155; }
+        /* VARIABLES DE COLOR */
+        :root { 
+            --primary: #10b981; 
+            --secondary: #64748b; 
+            --success: #22c55e; 
+            --danger: #ef4444; 
+            --warning: #f59e0b; 
+            --bg-body: #f1f5f9; 
+            --bg-card: #ffffff; 
+            --text-main: #0f172a; 
+            --text-muted: #64748b; 
+            --border: #e2e8f0; 
+            --radius: 12px; 
+            
+            /* Variables especificas para modales */
+            --bg-modal: #ffffff;
+            --bg-input: #ffffff;
+        }
+        
+        body.dark-mode { 
+            --primary: #34d399; 
+            --bg-body: #0f172a; 
+            --bg-card: #1e293b; 
+            --text-main: #f1f5f9; 
+            --text-muted: #94a3b8; 
+            --border: #334155; 
+            
+            /* Ajustes Dark Mode */
+            --bg-modal: #1e293b; 
+            --bg-input: #0f172a;
+        }
+        
         * { box-sizing: border-box; outline: none; }
         body { font-family: 'Segoe UI', Roboto, sans-serif; background-color: var(--bg-body); color: var(--text-main); margin: 0; padding: 0; transition: 0.3s; height: 100vh; overflow: hidden; }
         
@@ -46,11 +76,11 @@
         .btn-secondary { background: var(--secondary); color: white; }
         .btn-sm { padding: 5px 10px; font-size: 0.8rem; }
 
-        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-main); }
+        input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-input); color: var(--text-main); }
 
-        /* MODALS */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 3000; align-items: center; justify-content: center; }
-        .modal-content { background: var(--bg-card); padding: 25px; border-radius: var(--radius); width: 90%; max-width: 400px; text-align: center; }
+        /* MODALS (FIXED DARK MODE) */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 3000; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        .modal-content { background: var(--bg-modal); padding: 25px; border-radius: var(--radius); width: 90%; max-width: 400px; text-align: center; color: var(--text-main); border: 1px solid var(--border); box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         
         #toast { visibility: hidden; min-width: 250px; background: #333; color: #fff; text-align: center; border-radius: 4px; padding: 16px; position: fixed; z-index: 7000; left: 50%; bottom: 30px; transform: translateX(-50%); }
         #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
@@ -60,7 +90,7 @@
 </head>
 <body>
 
-<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:6000; justify-content:center; align-items:center;">
+<div id="loading-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:6000; justify-content:center; align-items:center;">
     <i class="fas fa-spinner fa-spin fa-2x" style="color:var(--primary)"></i>
 </div>
 
@@ -163,7 +193,7 @@
     <div class="modal-content" style="max-width: 600px; height: 80vh; display: flex; flex-direction: column; padding: 0;">
         
         <!-- Cabecera (Fija) -->
-        <div style="padding: 20px 20px 10px 20px; border-bottom: 1px solid var(--border);">
+        <div style="padding: 20px 20px 10px 20px; border-bottom: 1px solid var(--border); background: var(--bg-modal);">
             <h3 style="margin-top:0; margin-bottom:15px;"><i class="fas fa-search-location"></i> Inventario Global</h3>
             <input id="global-search-input" placeholder="🔍 Nombre o ID Global..." onkeyup="searchGlobal()" style="margin-bottom:0">
         </div>
@@ -174,7 +204,7 @@
         </div>
 
         <!-- Pie (Fijo) -->
-        <div style="padding: 10px 20px 20px 20px; border-top: 1px solid var(--border);">
+        <div style="padding: 10px 20px 20px 20px; border-top: 1px solid var(--border); background: var(--bg-modal);">
             <button class="btn-secondary" onclick="closeModal('global-modal')" style="width:100%">Cerrar</button>
         </div>
     </div>
@@ -273,7 +303,7 @@
         let total = 0;
         cart.forEach((c,i) => {
             total += c.price * c.qty;
-            list.innerHTML += `<li class="item-row" style="background:white"><div><b>${c.qty}x</b> ${c.name}</div><button class="btn-danger btn-sm" onclick="cart.splice(${i},1);renderCart()">x</button></li>`;
+            list.innerHTML += `<li class="item-row" style="background:var(--bg-body); border-left: 4px solid var(--primary)"><div><b>${c.qty}x</b> ${c.name}</div><button class="btn-danger btn-sm" onclick="cart.splice(${i},1);renderCart()">x</button></li>`;
         });
         document.getElementById('cart-total').textContent = '$'+total.toFixed(2);
     }
@@ -400,16 +430,12 @@
         const list = document.getElementById('global-list');
         list.innerHTML = `<li style="text-align:center; padding:20px; list-style:none; color:var(--text-muted);"><i class="fas fa-spinner fa-spin"></i> Cargando...</li>`;
 
-        // Añadimos console.log para ver qué estamos enviando
-        console.log("Enviando búsqueda:", { my_store_code: activeCode, search_term: term });
-
         const { data, error } = await supabaseClient.rpc('search_other_stores', { 
             my_store_code: activeCode, 
             search_term: term 
         });
         
         if (error) {
-            // CAMBIO IMPORTANTE: Imprimir el mensaje y los detalles, no solo el objeto
             console.error("Error SQL:", error.message, error.details, error.hint);
             list.innerHTML = `<li style="text-align:center; padding:20px; color:var(--danger);">Error: ${error.message}</li>`;
             return;
@@ -449,7 +475,7 @@
             list.innerHTML = `
                 <li style="text-align:center; padding: 20px; color: var(--text-muted); list-style:none;">
                     <i class="fas fa-box-open" style="font-size: 2rem; margin-bottom: 10px; display: block; opacity: 0.5;"></i>
-                    No se encontraron productos asociados a este usuario.
+                    No se encontraron productos.
                 </li>`;
         }
     }
